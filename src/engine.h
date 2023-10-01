@@ -3,16 +3,18 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "key.h"
+#include "input_def.h"
 
 // ################################################################
 // defines
 // ################################################################
 
-#define NUMBER_OF_CELLS_ON_AXIS_X 80 // 320
-#define NUMBER_OF_CELLS_ON_AXIS_Y 40 // 240
-#define PIXELS_PER_CELL           16 //   5
-#define PIXEL_GAP_BETWEEN_CELLS    1 //   0
+#define VSYNC 0 // 0: off, 1: on
+
+#define NUMBER_OF_CELLS_ON_AXIS_X 320 // 320
+#define NUMBER_OF_CELLS_ON_AXIS_Y 240 // 240
+#define PIXELS_PER_CELL             5 //   5
+#define PIXEL_GAP_BETWEEN_CELLS     0 //   0
 
 #define BLACK 0x000000
 #define WHITE 0xFFFFFF
@@ -32,13 +34,14 @@ typedef int32_t i32;
 typedef uint32_t color_t;
 
 typedef enum {
-    KEY_STATE_DOWN,     // last frame: <key-pressed>,     current frame: <key-pressed>
-    KEY_STATE_UP,       // last frame: <key-not-pressed>, current frame: <key-not-pressed>
-    KEY_STATE_PRESSED,  // last frame: <key-not-pressed>, current frame: <key-pressed>
-    KEY_STATE_RELEASED, // last frame: <key-pressed>,     current frame: <key-not-pressed>
-} key_state_t;
+    INPUT_STATE_DOWN,     // last frame: <pressed>,     current frame: <pressed>
+    INPUT_STATE_UP,       // last frame: <not-pressed>, current frame: <not-pressed>
+    INPUT_STATE_PRESSED,  // last frame: <not-pressed>, current frame: <pressed>
+    INPUT_STATE_RELEASED, // last frame: <pressed>,     current frame: <not-pressed>
+} input_state_t;
 
 typedef int key_id_t; // key_t already exists :(
+typedef int button_id_t; // key_t already exists :(
 
 // ################################################################
 // function declarations
@@ -55,6 +58,8 @@ void engine_set_background(color_t);
 void engine_set_cell(i32 x, i32 y, color_t);
 color_t engine_get_cell(i32 x, i32 y);
 
-key_state_t engine_get_key_state(key_id_t);
+input_state_t engine_get_key_state(key_id_t);
+input_state_t engine_get_button_state(button_id_t);
+bool engine_get_hovered_cell(i32* x, i32* y);
 
 #endif // ENGINE_H

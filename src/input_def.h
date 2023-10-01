@@ -127,4 +127,20 @@
 #define KEY_MIN KEY_SPACE
 #define KEY_MAX KEY_MENU
 
+#define BUTTON_1         0
+#define BUTTON_2         1
+#define BUTTON_3         2
+#define BUTTON_4         3
+#define BUTTON_5         4
+#define BUTTON_6         5
+#define BUTTON_7         6
+#define BUTTON_8         7
+#define BUTTON_LAST      BUTTON_8
+#define BUTTON_LEFT      BUTTON_1
+#define BUTTON_RIGHT     BUTTON_2
+#define BUTTON_MIDDLE    BUTTON_3
+
+#define BUTTON_MIN BUTTON_1
+#define BUTTON_MAX BUTTON_8
+
 #endif // ENGINE_KEY_H

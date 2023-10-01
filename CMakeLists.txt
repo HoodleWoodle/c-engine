@@ -11,6 +11,8 @@ add_executable(engine
 	src/main.c 
 	src/engine.h
 	src/engine.c
+	src/input_def.h
+	src/example.h
 )
 
 target_link_libraries(engine glfw glad cglm)

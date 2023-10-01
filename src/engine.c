@@ -30,8 +30,8 @@ const char* SHADER_VERTEX = \
     "uniform mat4 u_proj_view;\n"
     "out vec3 pass_color;\n"
     "void main() {\n"
-    "  gl_Position = u_proj_view * vec4(in_pos, 0.0, 1.0);\n"
-    "  pass_color = in_color;\n"
+    "   gl_Position = u_proj_view * vec4(in_pos, 0.0, 1.0);\n"
+    "   pass_color = in_color;\n"
     "}\n"
 ;
 const char* SHADER_FRAGMENT = \
@@ -39,7 +39,7 @@ const char* SHADER_FRAGMENT = \
     "in vec3 pass_color;\n"
     "out vec4 out_color;\n"
     "void main() {\n"
-    "	out_color = vec4(pass_color, 1.0);\n"
+    "   out_color = vec4(pass_color, 1.0);\n"
     "}\n"
 ;
 
@@ -65,6 +65,10 @@ static void engine_check_compile_errors(GLuint id, const char* type);
 static vec3s engine_from_color(color_t);
 static color_t engine_to_color(vec3s);
 
+static bool engine_get_input_state(bool* last_frame, bool* current_frame, int id);
+
+static bool engine_is_in_bounds(i32 min, i32 max, i32 val);
+
 // ################################################################
 // global variables
 // ################################################################
@@ -77,13 +81,17 @@ static GLuint s_ibo;
 static GLuint s_vbo_positions;
 static GLuint s_vbo_colors;
 
+static vec2s s_offset;
 static mat4s s_proj_view;
 
 static vec3s s_vertex_colors[VERTEX_COUNT];
 static bool s_vertex_colors_modified;
 
 static bool s_key_down_last_frame[KEY_MAX];
-static bool s_key_down[KEY_MAX];
+static bool s_key_down_current_frame[KEY_MAX];
+
+static bool s_button_down_last_frame[KEY_MAX];
+static bool s_button_down_current_frame[KEY_MAX];
 
 // ################################################################
 // function definitions
@@ -102,7 +110,7 @@ void engine_init() {
 	ASSERT(s_window, "GLFW: could not create window");
 
 	glfwMakeContextCurrent(s_window);
-	glfwSwapInterval(1);
+	glfwSwapInterval(VSYNC);
     glfwSetFramebufferSizeCallback(s_window, engine_glfw_framebuffer_size_callback);
 
 	int glad_load_success = gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
@@ -213,7 +221,10 @@ void engine_frame_begin() {
     s_vertex_colors_modified = false;
 
     for (size_t i = KEY_MIN; i < KEY_MAX; i++) {
-        s_key_down[i] = glfwGetKey(s_window, i) == GLFW_PRESS;
+        s_key_down_current_frame[i] = glfwGetKey(s_window, i) == GLFW_PRESS;
+    }
+    for (size_t i = BUTTON_MIN; i < BUTTON_MAX; i++) {
+        s_button_down_current_frame[i] = glfwGetMouseButton(s_window, i) == GLFW_PRESS;
     }
 }
 
@@ -231,7 +242,8 @@ void engine_frame_end() {
     
 	glfwSwapBuffers(s_window);
 
-    memcpy(s_key_down_last_frame, s_key_down, KEY_MAX);
+    memcpy(s_key_down_last_frame, s_key_down_current_frame, KEY_MAX);
+    memcpy(s_button_down_last_frame, s_button_down_current_frame, KEY_MAX);
 }
 
 void engine_set_background(color_t c) {
@@ -240,8 +252,8 @@ void engine_set_background(color_t c) {
 }
 
 void engine_set_cell(i32 x, i32 y, color_t c) {
-    if (x < 0 || x >= NUMBER_OF_CELLS_ON_AXIS_X) FAIL("ERROR: coordinate 'x' out of bounds: %i", x);
-    if (y < 0 || y >= NUMBER_OF_CELLS_ON_AXIS_Y) FAIL("ERROR: coordinate 'y' out of bounds: %i", y);
+    if (!engine_is_in_bounds(0, NUMBER_OF_CELLS_ON_AXIS_X, x)) FAIL("ERROR: coordinate 'x' out of bounds: %i", x);
+    if (!engine_is_in_bounds(0, NUMBER_OF_CELLS_ON_AXIS_Y, y)) FAIL("ERROR: coordinate 'y' out of bounds: %i", y);
 
 	vec3s color = engine_from_color(c);
 
@@ -259,23 +271,34 @@ void engine_set_cell(i32 x, i32 y, color_t c) {
 }
 
 color_t engine_get_cell(i32 x, i32 y) {
-    if (x < 0 || x >= NUMBER_OF_CELLS_ON_AXIS_X) FAIL("ERROR: coordinate 'x' out of bounds: %i", x);
-    if (y < 0 || y >= NUMBER_OF_CELLS_ON_AXIS_Y) FAIL("ERROR: coordinate 'y' out of bounds: %i", y);
+    if (!engine_is_in_bounds(0, NUMBER_OF_CELLS_ON_AXIS_X, x)) FAIL("ERROR: coordinate 'x' out of bounds: %i", x);
+    if (!engine_is_in_bounds(0, NUMBER_OF_CELLS_ON_AXIS_Y, y)) FAIL("ERROR: coordinate 'y' out of bounds: %i", y);
 
     size_t base = FROM_2D(x, y, NUMBER_OF_CELLS_ON_AXIS_X) * QUAD_VERTEX_COUNT;
     return engine_to_color(s_vertex_colors[base]);
 }
 
-key_state_t engine_get_key_state(key_id_t id) {
-    if (s_key_down[id] && s_key_down_last_frame[id])
-        return KEY_STATE_DOWN;
-    if (!s_key_down[id] && !s_key_down_last_frame[id])
-        return KEY_STATE_UP;
-    if (s_key_down[id] && !s_key_down_last_frame[id])
-        return KEY_STATE_PRESSED;
-    if (!s_key_down[id] && s_key_down_last_frame[id])
-        return KEY_STATE_RELEASED;
-    // unreachable
+input_state_t engine_get_key_state(key_id_t id) {
+    return engine_get_input_state(s_key_down_last_frame, s_key_down_current_frame, id);
+}
+
+input_state_t engine_get_button_state(button_id_t id) {
+    return engine_get_input_state(s_button_down_last_frame, s_button_down_current_frame, id);
+}
+
+bool engine_get_hovered_cell(i32* x, i32* y) {
+    double xpos, ypos;
+    glfwGetCursorPos(s_window, &xpos, &ypos);
+    i32 pos_x = (i32)xpos;
+    i32 pos_y = (i32)ypos;
+
+    pos_x = pos_x - s_offset.x;
+    pos_y = pos_y - s_offset.y;
+
+    *x = pos_x / (PIXELS_PER_CELL + PIXEL_GAP_BETWEEN_CELLS);
+    *y = pos_y / (PIXELS_PER_CELL + PIXEL_GAP_BETWEEN_CELLS);
+
+    return engine_is_in_bounds(0, NUMBER_OF_CELLS_ON_AXIS_X, *x) && engine_is_in_bounds(0, NUMBER_OF_CELLS_ON_AXIS_Y, *y);
 }
 
 // ################################################################
@@ -295,7 +318,9 @@ static void engine_glfw_framebuffer_size_callback(GLFWwindow*, int width, int he
 	float right  = (float)width;
 	mat4s proj = glms_ortho(left, right, bottom, top, 0.0f, 1.0f);
 
-    vec3s offset = (vec3s){ (width - NUMBER_OF_PIXELS_IN_GRID_ON_AXIS_X) / 2.0, (height - NUMBER_OF_PIXELS_IN_GRID_ON_AXIS_Y) / 2.0, 0.0 };
+    s_offset.x = (width - NUMBER_OF_PIXELS_IN_GRID_ON_AXIS_X) / 2.0;
+    s_offset.y = (height - NUMBER_OF_PIXELS_IN_GRID_ON_AXIS_Y) / 2.0;
+    vec3s offset = (vec3s){ s_offset.x, s_offset.y, 0.0 };
     mat4s view = glms_mat4_identity();
     glm_translate(view.raw, offset.raw);
 
@@ -333,4 +358,20 @@ static color_t engine_to_color(vec3s c) {
     u32 g = (u32)(c.g * 255);
     u32 b = (u32)(c.b * 255);
 	return (r << 16) | (g << 8) | (b << 0);
+}
+
+static bool engine_get_input_state(bool* last_frame, bool* current_frame, int id) {
+    if (current_frame[id] && last_frame[id])
+        return INPUT_STATE_DOWN;
+    if (!current_frame[id] && !last_frame[id])
+        return INPUT_STATE_UP;
+    if (current_frame[id] && !last_frame[id])
+        return INPUT_STATE_PRESSED;
+    if (!current_frame[id] && last_frame[id])
+        return INPUT_STATE_RELEASED;
+    // unreachable
+}
+
+static bool engine_is_in_bounds(i32 min, i32 max, i32 val) {
+    return val >= min && val < max;
 }
